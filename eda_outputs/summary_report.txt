@@ -1,0 +1,102 @@
+ASTraM EVENT-DRIVEN CONGESTION — EDA SUMMARY
+================================================
+Total events: 8173
+Date range : 2023-11-09 19:24:48.154000  ->  2024-04-08 17:11:42.780000
+  unplanned   : 94.3%
+  planned     : 5.7%
+
+Top causes:
+  vehicle_breakdown : 4896
+  others            : 638
+  pot_holes         : 537
+  construction      : 480
+  water_logging     : 458
+
+Share during peak hours (8-10,17-20): 25.4%
+Median time-to-clear: 360 min (90th pct 1593 min)
+
+------------------------------------------------
+
+Loading: Astram event data_anonymized - Astram event data_anonymizedb40ac87.csv
+   shape: 8173 rows x 46 cols
+
+=== DATA QUALITY ===
+Missing % (top 15):
+map_file                 100.0
+resolved_at_address      100.0
+comment                  100.0
+meta_data                100.0
+last_modified_by_id      100.0
+created_by_id            100.0
+closed_by_id             100.0
+resolved_by_id           100.0
+direction                 99.5
+resolved_at_latitude      99.1
+resolved_at_longitude     99.1
+resolved_datetime         99.1
+route_path                98.9
+assigned_to_police_id     98.4
+citizen_accident_id       98.4
+   saved  eda_outputs\01_missingness.png
+   saved  eda_outputs\02_planned_vs_unplanned.png
+   saved  eda_outputs\03_event_cause.png
+   saved  eda_outputs\04_cause_by_type.png
+   saved  eda_outputs\05_by_hour.png
+   saved  eda_outputs\06_by_dayofweek.png
+   saved  eda_outputs\07_monthly_trend.png
+   saved  eda_outputs\08_heatmap_day_hour.png
+   saved  eda_outputs\09_by_corridor.png
+   saved  eda_outputs\10_by_zone.png
+   saved  eda_outputs\11_by_police_station.png
+   saved  eda_outputs\12_by_junction.png
+   saved  eda_outputs\13_geo_scatter.png
+   saved  eda_outputs\14_geo_density.png
+   saved  eda_outputs\15_priority_pie.png
+   saved  eda_outputs\16_priority_by_cause.png
+   saved  eda_outputs\17_rerouting.png
+   saved  eda_outputs\18_vehicle_type.png
+
+=== RESOLUTION TIME (minutes) ===
+count     305.0
+mean      874.5
+std      1580.7
+min         0.0
+25%        21.0
+50%       359.7
+75%       764.5
+max      8641.0
+   saved  eda_outputs\19_duration_hist.png
+   saved  eda_outputs\20_duration_by_cause.png
+   saved  eda_outputs\21_status.png
+
+=== TOP 10 HOTSPOTS (corridor x cause) ===
+      corridor       event_cause  events  median_clear_min
+  Non-corridor vehicle_breakdown    1649       1043.340800
+   Mysore Road vehicle_breakdown     565         24.501167
+Bellary Road 1 vehicle_breakdown     449               NaN
+   Tumkur Road vehicle_breakdown     383               NaN
+Bellary Road 2 vehicle_breakdown     269               NaN
+  Non-corridor            others     258               NaN
+  Non-corridor         pot_holes     227               NaN
+  Non-corridor          accident     197       2154.582517
+  Non-corridor         tree_fall     191               NaN
+  Non-corridor     water_logging     186               NaN
+
+ASTraM EVENT-DRIVEN CONGESTION — EDA SUMMARY
+================================================
+Total events: 8173
+Date range : 2023-11-09 19:24:48.154000  ->  2024-04-08 17:11:42.780000
+  unplanned   : 94.3%
+  planned     : 5.7%
+
+Top causes:
+  vehicle_breakdown : 4896
+  others            : 638
+  pot_holes         : 537
+  construction      : 480
+  water_logging     : 458
+
+Share during peak hours (8-10,17-20): 25.4%
+Median time-to-clear: 360 min (90th pct 1593 min)
+
+All charts + report written to ./eda_outputs/

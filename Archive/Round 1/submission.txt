@@ -1,0 +1,112 @@
+Final score - 90.59569
+
+TRAFFIC DEMAND PREDICTION - APPROACH & METHODOLOGY
+
+1. PROBLEM OVERVIEW
+
+
+The task was to predict the demand for traffic at different geo-locations across different times of the day, based on features like road type, weather, number of lanes, landmarks, large vehicles, and temperature.
+
+2. TOOLS & LIBRARIES USED
+
+- Python 3
+- pandas : loading, cleaning, manipulation of data
+- numpy : feature engineering using numerical functions
+- matplotlib : exploratory data analysis (EDA), plotting
+- scikit-learn : train/validation split, performance metrics (R 2 , RMSE)
+- CatBoost : gradient boosting model that intrinsically supports categorical features
+
+
+3. EXPLORATORY DATA ANALYSIS (EDA)
+
+Prior to model building, the data was explored for understanding its characteristics and identifying issues:
+- Checked all columns for missing values. (Temperature, Weather, RoadType columns had missing entries).
+- Confirmed there are no duplicate rows.
+- Analyzed distribution of the target feature (demand). It was highly right-skewed with some data points that had high demand.
+- Plotted average demand per hour of the day. We can see clear peaks during rush hours.
+- Visualized the distribution of all categorical features (Weather, RoadType, LargeVehicles, Landmarks, NumberofLanes).
+- Visualized average demand grouped by each feature.
+The key takeaways were that demand has clear hourly pattern, highway road type and higher number of lanes corresponds with higher demand. Presence of landmark and weather significantly affect demand.
+
+
+
+4. DATA PREPROCESSING
+
+a) Parsing Timestamp
+ The Timestamp column was in HH:MM format. It was parsed into datetime format so that we could extract hour information and build other features.
+
+B) Handling Missing Values
+ - Temperature column had missing values that were filled by the median value of the temperature.
+ - Weather column had missing values that were filled by the mode (most frequent value).
+ - RoadType column had missing values that were filled by the mode (most frequent value).
+
+C) Binary Encoding
+ - Landmarks and LargeVehicles columns were encoded into binary form(0, 1). 1 represents the presence and 0 represents absence. This was to allow for simpler use in models.
+
+
+5. FEATURE ENGINEERING
+
+a) Cyclical Hour Encoding
+ Since hour is a cyclical feature (hour 23 is just before hour 0), we can encode it into sin and cosine functions.
+ Hour_sin = sin(2*hour/24)
+ hour_cos = cos(2*hour/24)
+
+b) Road Capacity Score
+ Created a feature to capture effective capacity of the road.
+ Capacityscore = roadweight NumberofLanes (1 + LargeVehicles)
+ where, weights of roads were:
+ Residential = 1
+ Street = 2
+ Highway = 3
+
+c) Road-Hour Interaction
+ A basic interaction feature was created between the road type weight and the hour of day to capture time-of-day pattern variation with road types.
+ Roadhourinteraction = road_weight hour
+
+d) Geohash Target Encoding
+ As there were 1,249 unique geohash locations, directly using them (e.g. One-hot encoding) would not be efficient. Instead, each geohash was replaced with the mean demand recorded at that particular geohash location.
+
+
+In order to avoid data leakage (the target affecting its own
+encoding), the data was split into two sets: 80% train fold,
+and 20% validation fold. The means of geohash codes were calculated
+on the train fold and then mapped onto train fold, validation fold,
+and test fold. Unseen geohash codes were set to 0 for the test set.
+
+
+6. MODEL
+
+Algorithm: CatBoostRegressor (gradient boosting).
+
+I chose this algorithm because:
+- Categorical features can be passed in directly, without manual
+  one-hot encoding.
+- CatBoost is resistant to overfitting by employing ordered boosting.
+- CatBoost can handle heterogeneous tabular data well.
+
+Categorical features that were fed into the model:
+ geohash, RoadType, Weather, LargeVehicles, Landmarks
+
+Parameters:
+ - iterations: 4000
+ - learning_rate: 0.05
+ - depth: 6
+ - loss_function: RMSE
+ - random_seed: 42
+
+The model was trained on the training data and validated on the validation data.
+
+
+7. EVALUATION
+
+The evaluation metrics are R (coefficient of determination) and RMSE
+(root mean squared error), computed on the held-out validation fold.
+
+Additionally, feature importance was extracted from the model
+in order to know which feature impacts predictions the most.
+
+
+8. SUBMISSION
+
+I used the trained model to generate demand predictions on the test data
+and saved the results to submission.csv as specified (Index, demand).

@@ -1,0 +1,7 @@
+using gitlens for the lengthy file: 
+git reset --soft HEAD~1 # undo commit
+git lfs track "*.csv" # ask git lens to track csvs
+git add .gitattributes
+git add .
+git commit -m "init"
+git push origin main

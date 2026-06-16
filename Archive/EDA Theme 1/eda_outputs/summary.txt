@@ -1,0 +1,76 @@
+Total rows: 298,450
+Exact duplicate rows: 0
+Duplicate ids: 0
+Out-of-Bengaluru / missing geo: 0 (0.0%)
+Date range: 2023-11-09 19:11:46+00:00  ->  2024-04-08 17:30:46+00:00
+Top hotspot cell: {'cell_lat': 12.981, 'cell_lon': 77.61, 'count': 4411, 'location': 'Kamaraj Road, Sri Nagamma Devi Circle, Sivanchetti Gardens, Bengaluru, Karnataka. Pin-560042 (India)'}
+created_by: 94,412 unique, top-10 produce 0.1%
+device_id: 3,070 unique, top-10 produce 7.6%
+
+Loaded jan to may police violation_anonymized791b166.csv: 298,450 rows x 24 cols
+
+Resolved columns:
+  id                     -> id
+  lat                    -> latitude
+  lon                    -> longitude
+  location               -> location
+  vehicle_number         -> vehicle_number
+  vehicle_type           -> vehicle_type
+  description            -> description
+  violation_type         -> violation_type
+  offence_code           -> offence_code
+  created_date           -> created_datetime
+  closed_date            -> closed_datetime
+  modified_date          -> modified_datetime
+  device_id              -> device_id
+  created_by             -> created_datetime
+  center_code            -> center_code
+  police_station         -> police_station
+  data_sent              -> data_sent_to_scita
+  junction_name          -> junction_name
+  action_taken           -> action_taken_timestamp
+  validation_status      -> validation_status
+  validation_timestamp   -> validation_timestamp
+
+Using 'created_datetime' for intraday (hour/DOW) analysis.
+
+Wrote column_summary.csv
+== Data quality ==
+  saved 01_missingness.png
+  duplicates=0  (see summary.txt)
+
+== Distributions ==
+  saved 02_violation_type.png
+  saved 03_vehicle_type.png
+  saved 04_offence_codes.png
+  saved 05_police_stations.png
+  saved 06_validation_status.png
+  saved 07_data_sent.png
+
+== Temporal ==
+  saved 08_daily_volume.png
+  saved 09_hour_of_day.png
+  saved 10_day_of_week.png
+  saved 11_hour_dow_heatmap.png
+
+== Spatial ==
+  saved 12_hexbin_density.png
+  wrote top_hotspots.csv  (top cell has 4,411 hits)
+  folium not installed -> skipped interactive heatmap
+
+== Enforcement / selection bias ==
+  saved 13_officer_concentration.png
+  created_by: 94,412 unique, top-10 share=0.1%
+  saved 14_device_concentration.png
+  device_id: 3,070 unique, top-10 share=7.6%
+
+== Cross-tabs ==
+  saved 15_vehicle_x_violation.png
+C:\Users\C.Karthikeshwar\Desktop\eda_1.py:452: Pandas4Warning: Starting with pandas version 4.0 all arguments of sum will be keyword-only.
+  ct = ct.loc[ct.sum(1).sort_values().index]
+  saved 16_station_x_violation.png
+  saved 17_rejection_rate.png
+
+
+Text summary -> eda_outputs\summary.txt
+All figures + CSVs are in: C:\Users\C.Karthikeshwar\Desktop\eda_outputs
