@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_absolute_error
 
-import astram_decisions as D
+import decisions as D
 
 OUTDIR          = "pipeline_out"
 LOG_PATH        = os.path.join(OUTDIR, "predictions_log.csv")

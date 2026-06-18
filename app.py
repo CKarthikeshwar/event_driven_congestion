@@ -33,7 +33,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import streamlit as st
 
-import astram_decisions as D   # Phase-2 logic (which imports Phase-0/1 helpers)
+import decisions as D   # Phase-2 logic (which imports Phase-0/1 helpers)
 
 OUTDIR = "pipeline_out"
 DOW_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]

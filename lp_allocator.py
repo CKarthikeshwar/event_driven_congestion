@@ -28,7 +28,7 @@ Requires: pandas, numpy  (optional: pulp for exact ILP, scipy for LP fallback)
 """
 import numpy as np
 import pandas as pd
-import astram_decisions as D
+import decisions as D
 
 DOW_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
