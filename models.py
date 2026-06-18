@@ -4,7 +4,7 @@
 ====================================================================
  ASTraM — PHASE 1 : Baseline Models
 ====================================================================
-Reads pipeline_out/modeling_table.pkl (from astram_clean.py) and trains the
+Reads pipeline_out/modeling_table.pkl (from clean.py) and trains the
 two baseline models in the pipeline, both gradient-boosted:
 
   A) PER-EVENT TRIAGE  (answers "how bad is THIS incident?")

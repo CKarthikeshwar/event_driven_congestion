@@ -19,7 +19,7 @@ It does, in order:
   7. Save modeling_table.pkl (typed) + .csv (inspection) + diagnostics.
 
 Usage:
-    python astram_clean.py "Astram event data_anonymized.xlsx"
+    python astram_clean.py "Astram event data_anonymized - Astram event data_anonymizedb40ac87.csv"
 
 Output dir: ./pipeline_out/
 Requires: pandas, numpy, openpyxl   (ftfy optional)
@@ -263,7 +263,7 @@ def add_impact_score(df):
 
 # ----------------------------------------------------------------------
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else "Astram event data_anonymized.xlsx"
+    path = sys.argv[1] if len(sys.argv) > 1 else "Astram event data_anonymized - Astram event data_anonymizedb40ac87.csv"
     if not os.path.exists(path):
         sys.exit(f"File not found: {path}")
     df = base_clean(load(path))
