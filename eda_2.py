@@ -38,7 +38,7 @@ warnings.filterwarnings("ignore")
 sns.set_theme(style="whitegrid")
 plt.rcParams.update({"figure.dpi": 110, "savefig.bbox": "tight", "font.size": 10})
 
-DEFAULT_PATH = "Astram event data_anonymized.xlsx"
+DEFAULT_PATH = "Astram event data_anonymized - Astram event data_anonymizedb40ac87.csv"
 OUTDIR = "eda_outputs"
 os.makedirs(OUTDIR, exist_ok=True)
 _fig_n = 0
