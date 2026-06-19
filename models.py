@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ====================================================================
- ASTraM — PHASE 1 : Baseline Models
+PHASE 1 : Baseline Models
 ====================================================================
 Reads pipeline_out/modeling_table.pkl (from clean.py) and trains the
 two baseline models in the pipeline, both gradient-boosted:
@@ -41,7 +41,7 @@ from sklearn.inspection import permutation_importance
 
 warnings.filterwarnings("ignore")
 OUTDIR = "pipeline_out"
-AREA_COL, FREQ = "police_station", "1h"
+AREA_COL, FREQ = "police_station", "3h"
 fig_n = 0
 
 def save(fig, name):
@@ -59,6 +59,12 @@ try:
     def make_clf(): return LGBMClassifier(n_estimators=400, learning_rate=0.05,
                                           num_leaves=48, subsample=0.8,
                                           colsample_bytree=0.8, verbose=-1)
+    def make_clf_balanced():
+        return LGBMClassifier(n_estimators=400, learning_rate=0.05,
+                            num_leaves=48, subsample=0.8,
+                            colsample_bytree=0.8, verbose=-1,
+                            is_unbalance=True)
+
     def make_reg(): return LGBMRegressor(n_estimators=500, learning_rate=0.05,
                                          num_leaves=48, subsample=0.8,
                                          colsample_bytree=0.8, verbose=-1)
@@ -67,6 +73,8 @@ except ImportError:
                                   HistGradientBoostingRegressor as _HR)
     _BACKEND = "sklearn-histgbm"
     def make_clf(): return _HC(max_iter=400, learning_rate=0.05)
+    def make_clf_balanced():
+        return _HC(max_iter=400, learning_rate=0.05, class_weight="balanced")
     def make_reg(): return _HR(max_iter=500, learning_rate=0.05)
 
 def importances(model, X, y, names):
@@ -123,7 +131,8 @@ def triage(tbl):
         tr, te = time_split(d)
         Xtr, Xte, enc, names = encode(tr, te, CAT, NUM)
         ytr, yte = tr[target].values, te[target].values
-        m = make_clf(); m.fit(Xtr, ytr)
+        m = make_clf_balanced() if target == "requires_rerouting" else make_clf()
+        m.fit(Xtr, ytr)
         proba = m.predict_proba(Xte)[:, 1]; pred = (proba >= 0.5).astype(int)
         print(f"\n[{target}]  train={len(tr)} test={len(te)}  positive rate={yte.mean():.2f}")
         if len(np.unique(yte)) == 2:
@@ -176,22 +185,20 @@ def forecaster(tbl):
     # lag / rolling features, computed PER AREA (causal: only past bins)
     panel = panel.sort_values([AREA_COL, "tbin"]).reset_index(drop=True)
     g = panel.groupby(AREA_COL)["count"]
-    for L in (1, 24, 168):
-        panel[f"lag_{L}"] = g.shift(L)
+    for lag_bins, lag_name in [(1, "lag_1"), (8, "lag_8"), (56, "lag_56")]:
+        panel[lag_name] = g.shift(lag_bins)
     shifted = panel.groupby(AREA_COL)["count"].shift(1)
-    panel["roll24"]  = (shifted.groupby(panel[AREA_COL])
-                        .rolling(24,  min_periods=1).mean().reset_index(level=0, drop=True))
-    panel["roll168"] = (shifted.groupby(panel[AREA_COL])
-                        .rolling(168, min_periods=1).mean().reset_index(level=0, drop=True))
+    panel["roll_24h"]  = (shifted.groupby(panel[AREA_COL]).rolling(8,  min_periods=1).mean().reset_index(level=0, drop=True))
+    panel["roll_7d"] = (shifted.groupby(panel[AREA_COL]).rolling(56, min_periods=1).mean().reset_index(level=0, drop=True))
 
     panel["hour"]       = panel["tbin"].dt.hour
     panel["dow"]        = panel["tbin"].dt.dayofweek
     panel["month"]      = panel["tbin"].dt.month
     panel["is_weekend"] = (panel["tbin"].dt.dayofweek >= 5).astype(float)
-    panel = panel.dropna(subset=["lag_168"])               # drop warm-up window
+    panel = panel.dropna(subset=["lag_56"])               # drop warm-up window
 
     FEATS = ["hour", "dow", "month", "is_weekend",
-             "lag_1", "lag_24", "lag_168", "roll24", "roll168"]
+             "lag_1", "lag_8", "lag_56", "roll_24h", "roll_7d"]
     # encode area as a categorical feature too
     enc = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
 
@@ -205,7 +212,7 @@ def forecaster(tbl):
     ytr, yte = tr["count"].values, te["count"].values
 
     m = make_reg(); m.fit(Xtr, ytr); pred = m.predict(Xte).clip(min=0)
-    naive = te["lag_168"].values                            # same hour last week
+    naive = te["lag_56"].values                            # same hour last week
     print(f"\nPanel: {len(panel)} station-hours | train {len(tr)} / test {len(te)}")
     print(f"   MODEL  MAE {mean_absolute_error(yte,pred):.3f}  "
           f"RMSE {mean_squared_error(yte,pred)**0.5:.3f}")
@@ -216,6 +223,13 @@ def forecaster(tbl):
 
     plot_importance(importances(m, Xte, yte, FEATS + ["area"]),
                     "Forecaster feature importance", "forecaster_importance")
+    # --- second model: severity (impact_sum per bin) ---
+    ytr_imp, yte_imp = tr["impact_sum"].values, te["impact_sum"].values
+    m_impact = make_reg()
+    m_impact.fit(Xtr, ytr_imp)
+    pred_imp = m_impact.predict(Xte).clip(min=0)
+    print(f"\n[impact_sum]  MAE {mean_absolute_error(yte_imp, pred_imp):.2f}  "
+          f"R2 {r2_score(yte_imp, pred_imp):.3f}")
 
     # actual vs predicted for the busiest area over the test window
     busiest = ev[AREA_COL].value_counts().idxmax()
@@ -227,9 +241,9 @@ def forecaster(tbl):
         ax.plot(sub["tbin"], sub["count"], label="actual", lw=1)
         ax.plot(sub["tbin"], sp, label="predicted", lw=1.2, alpha=0.8)
         ax.set_title(f"Forecast vs actual - {busiest} (test window)")
-        ax.set_ylabel("events / hour"); ax.legend()
+        ax.set_ylabel("events / 3h"); ax.legend()
         save(fig, "forecast_vs_actual")
-    return m, enc
+    return (m, m_impact), enc
 
 # ======================================================================
 def main():
@@ -239,9 +253,14 @@ def main():
     tbl = pd.read_pickle(pkl)
     print(f"Loaded modeling table: {tbl.shape}")
     triage_models = triage(tbl)
-    fc_model, fc_enc = forecaster(tbl)
+    (fc_count, fc_impact), fc_enc = forecaster(tbl)
     with open(os.path.join(OUTDIR, "fitted_models.pkl"), "wb") as f:
-        pickle.dump({"triage": triage_models, "forecaster": (fc_model, fc_enc)}, f)
+        pickle.dump({
+            "triage": triage_models,
+            "forecaster": (fc_count, fc_enc),           # count model — decisions.py uses this
+            "forecaster_severity": (fc_impact, fc_enc)  # severity model — new
+        }, f)
+
     print(f"\nSaved fitted models -> {OUTDIR}/fitted_models.pkl")
 
 if __name__ == "__main__":
