@@ -33,9 +33,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# priority_high is no longer a trained model — it's a deterministic rule
+# discovered from data: Non-corridor events are always Low, corridor events always High
+def _priority_rule(corridor_base, hour, is_weekend):
+    if str(corridor_base) == "Non-corridor":
+        return 0
+    return 1
+
 warnings.filterwarnings("ignore")
 OUTDIR = "pipeline_out"
-AREA_COL, FREQ = "police_station", "1h"
+AREA_COL, FREQ = "police_station", "3h"   # FREQ must match models.py (was "1h")
 
 # ---- operational config (tune to the real control room) ---------------
 SHIFTS = {"Morning": list(range(6, 14)),
@@ -83,28 +90,37 @@ def build_panel(tbl):
     panel["count"] = panel["count"].fillna(0.0)
     panel = panel.sort_values([AREA_COL, "tbin"]).reset_index(drop=True)
     g = panel.groupby(AREA_COL)["count"]
-    for L in (1, 24, 168):
-        panel[f"lag_{L}"] = g.shift(L)
+    # lag features in bin units (1 bin = 3h) — must match models.py exactly
+    for lag_bins, lag_name in [(1, "lag_1"), (4, "lag_12h"), (8, "lag_8"), (56, "lag_56")]:
+        panel[lag_name] = g.shift(lag_bins)
     shifted = panel.groupby(AREA_COL)["count"].shift(1)
-    panel["roll24"]  = (shifted.groupby(panel[AREA_COL])
-                        .rolling(24,  min_periods=1).mean().reset_index(level=0, drop=True))
-    panel["roll168"] = (shifted.groupby(panel[AREA_COL])
-                        .rolling(168, min_periods=1).mean().reset_index(level=0, drop=True))
+    panel["roll_24h"] = (shifted.groupby(panel[AREA_COL])
+                         .rolling(8,  min_periods=1).mean()
+                         .reset_index(level=0, drop=True))
+    panel["roll_7d"]  = (shifted.groupby(panel[AREA_COL])
+                         .rolling(56, min_periods=1).mean()
+                         .reset_index(level=0, drop=True))
     panel["hour"]       = panel["tbin"].dt.hour
     panel["dow"]        = panel["tbin"].dt.dayofweek
     panel["month"]      = panel["tbin"].dt.month
     panel["is_weekend"] = (panel["tbin"].dt.dayofweek >= 5).astype(float)
-    return panel.dropna(subset=["lag_168"])
+    # area-level static features — same as models.py
+    area_stats = (panel.groupby(AREA_COL)["count"]
+                  .agg(area_mean="mean", area_std="std")
+                  .reset_index())
+    area_stats["area_std"] = area_stats["area_std"].fillna(0)
+    panel = panel.merge(area_stats, on=AREA_COL, how="left")
+    return panel.dropna(subset=["lag_56"])   # drop warmup (was lag_168 with 1h bins)
 
 def expected_load_surface(tbl, forecaster):
     """Score the panel with the model, then collapse to a recurring weekly
     profile: expected events per (area, dow, shift), severity-weighted."""
-    model, enc = forecaster
+    # new format: (model, (FEATS, AREA_COL)) — no encoder, CatBoost handles natively
+    model, (FEATS, fc_area_col) = forecaster
     panel = build_panel(tbl)
-    FEATS = ["hour", "dow", "month", "is_weekend",
-             "lag_1", "lag_24", "lag_168", "roll24", "roll168"]
-    X = np.hstack([panel[FEATS].to_numpy(float),
-                   enc.transform(panel[[AREA_COL]].astype("object"))])
+    # build X exactly as in models.py: numeric FEATS + area as string categorical
+    X = panel[FEATS].astype(float).copy()
+    X[fc_area_col] = panel[fc_area_col].astype(str).values
     panel["pred"] = model.predict(X).clip(min=0)
     panel["shift"] = panel["hour"].map(shift_of)
 
@@ -191,11 +207,14 @@ def recommend_barricade(event, triage=None, cause_rates=None):
     """Per-event decision. Uses triage predictions if available, else the raw
     event flags. Returns (decision, level, reason)."""
     pred_reroute = event.get("requires_rerouting")
-    pred_high = event.get("priority_high")
-    if triage is not None:                       # predict from attributes
+    pred_high    = event.get("priority_high")
+    if triage is not None:
         p = score_triage(pd.DataFrame([event]), triage)
         pred_reroute = bool(p.get("requires_rerouting", [pred_reroute])[0])
-        pred_high = bool(p.get("priority_high", [pred_high])[0])
+        # priority_high from rule — no longer a trained model
+        pred_high = bool(_priority_rule(event.get("corridor_base"),
+                                        event.get("hour"),
+                                        event.get("is_weekend")))
     cause = event.get("cause")
     cause_prone = (cause_rates is not None and cause in cause_rates.index
                    and cause_rates.loc[cause, "reroute_rate"] >= 0.10)
@@ -240,22 +259,44 @@ def suggest_diversion(blocked, geo, k=DIVERSION_K):
     return others.sort_values("pick_score")[cols].head(k).round(2)
 
 # ======================================================================
-# Triage scoring (reconstruct features in the saved order)
+# Triage scoring
 # ======================================================================
+# maps hist feature names back to the source column they were computed from
+_HIST_COL_MAP = {
+    "cause_hist_rr":  "cause",
+    "corr_hist_rr":   "corridor_base",
+    "stn_hist_rr":    "police_station",
+    "cause_hist_dur": "cause",
+    "corr_hist_dur":  "corridor_base",
+}
+
 def score_triage(event_df, triage):
     out = {}
-    for target, (model, enc, names) in triage.items():
-        n_cat = enc.n_features_in_
-        cat_cols, num_cols = names[:n_cat], names[n_cat:]
-        for c in cat_cols + num_cols:
-            if c not in event_df.columns:
-                event_df[c] = np.nan
-        cat = enc.transform(event_df[cat_cols].astype("object"))
-        num = event_df[num_cols].to_numpy(dtype=float)
-        X = np.nan_to_num(np.hstack([cat, num]), nan=-2)
+    for target, model_info in triage.items():
+        model        = model_info[0]
+        cat_cols     = model_info[1]
+        num_cols     = model_info[2]
+        # hist_lookups present in new format (4-tuple); absent in old format (3-tuple)
+        hist_lookups = model_info[3] if len(model_info) > 3 else {}
+
+        event_df = event_df.copy()
+        # apply historical rate features before building X
+        for feat_name, info in hist_lookups.items():
+            grp_col = _HIST_COL_MAP.get(feat_name, feat_name)
+            event_df[feat_name] = (event_df[grp_col].astype(str)
+                                   .map(info["lookup"])
+                                   .fillna(info["default"]))
+
+        # build X as DataFrame — CatBoost reads raw strings for cat columns
+        X = pd.concat([
+                event_df[cat_cols].astype(str).fillna("NA"),
+                event_df[num_cols].astype(float).fillna(-1)
+            ], axis=1)
+
         if hasattr(model, "predict_proba"):
-            out[target] = (model.predict_proba(X)[:, 1] >= 0.5).astype(int)
-            out[target + "_proba"] = model.predict_proba(X)[:, 1]
+            probas = model.predict_proba(X)[:, 1]
+            out[target]              = (probas >= 0.5).astype(int)
+            out[target + "_proba"]   = probas
         else:
             out[target] = model.predict(X)
     return out
@@ -268,6 +309,11 @@ def handle_event(event, artifacts):
     cause_rates = cause_rerouting_rates(tbl)
     geo = corridor_geo(tbl)
     pred = score_triage(pd.DataFrame([event]), triage)
+    # add priority_high from rule — not a trained model anymore
+    pred["priority_high"]       = [_priority_rule(event.get("corridor_base"),
+                                                   event.get("hour"),
+                                                   event.get("is_weekend"))]
+    pred["priority_high_proba"] = pred["priority_high"]
     decision, level, reason = recommend_barricade(event, triage, cause_rates)
     result = {"triage": {k: (v[0] if hasattr(v, "__len__") else v)
                          for k, v in pred.items()},
