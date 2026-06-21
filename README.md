@@ -235,7 +235,7 @@ The Post-Event Learning Loop extends ASTraM by introducing a continuous feedback
 
 ---
 
-## Authors
+## Remarks
 
 Developed as an extension to the **ASTraM (Adaptive Smart Traffic Management)** framework for the Smart India Hackathon problem statement:
 
