@@ -34,8 +34,7 @@ Changes from previous version:
   - severity model removed (stopped at iter 0, R2≈0 — data too sparse)
 
 NOTE: decisions.py storage format:
-  triage -> {target: (model, cat_cols, num_cols, hist_lookups)}
-            hist_lookups = {feat_name: {"lookup": dict, "default": float}}
+  triage -> {target: (model, cat_cols, num_cols, hist_lookups)} hist_lookups = {feat_name: {"lookup": dict, "default": float}}
   forecaster -> (model, (FEATS, AREA_COL))   [unchanged]
   See compatibility note at bottom of main() for decisions.py updates.
 
@@ -144,8 +143,11 @@ def time_split_3way(df):
 # same idea but for the forecaster panel which is indexed by tbin (time bin) not occurrence_ts
 # uses quantile on tbin to find the cut points so the split is even in time, not in row count
 def panel_split_3way(panel):
+    # fiding the split points based on the quantiles of tbin coloumn 
     cut1 = panel["tbin"].quantile(TRAIN_FRAC)
     cut2 = panel["tbin"].quantile(TRAIN_FRAC + VAL_FRAC)
+    # create the splits based on the cut points
+    # we use copy to avoid modifying the original panel
     tr   = panel[panel["tbin"] <= cut1].copy()
     val  = panel[(panel["tbin"] > cut1) & (panel["tbin"] <= cut2)].copy()
     te   = panel[panel["tbin"] >  cut2].copy()
@@ -368,20 +370,14 @@ def forecaster(tbl):
     # 2 events at Yelahanka is routine; 2 events at a quiet station is unusual
     # computed from the full panel BEFORE the split — these are static area properties,
     # similar to how lag features also use the full panel before splitting
-    area_stats = (panel.groupby(AREA_COL)["count"]
-                  .agg(area_mean="mean", area_std="std")
-                  .reset_index())
+    area_stats = (panel.groupby(AREA_COL)["count"].agg(area_mean="mean", area_std="std").reset_index())
     area_stats["area_std"] = area_stats["area_std"].fillna(0)  # areas with 1 row have NaN std
     panel = panel.merge(area_stats, on=AREA_COL, how="left")
-
-    panel               = panel.dropna(subset=["lag_56"])   # drop warm-up as the first 7 days have no lag_56
+    panel = panel.dropna(subset=["lag_56"])   # drop warm-up as the first 7 days have no lag_56
     # lag_12h only needs 4 bins warmup, which is satisfied once lag_56 (56 bins) is satisfied
 
     # final features — includes new lag_12h and area baseline features
-    FEATS = ["hour", "dow", "month", "is_weekend",
-             "lag_1", "lag_12h", "lag_8", "lag_56",
-             "roll_24h", "roll_7d",
-             "area_mean", "area_std"]   # change #7
+    FEATS = ["hour", "dow", "month", "is_weekend", "lag_1", "lag_12h", "lag_8", "lag_56", "roll_24h", "roll_7d", "area_mean", "area_std"]   # change #7
 
     def make_fc_X(df):
         """Feature matrix: numeric FEATS + area as native categorical."""

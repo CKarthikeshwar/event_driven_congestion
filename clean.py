@@ -116,8 +116,7 @@ def base_clean(df):
         if df[c].map(lambda x: isinstance(x, str)).any():
             df[c] = df[c].map(fix_mojibake)
     # coerce coordinates to numeric, treat 0 as NaN
-    for c in ("latitude", "longitude", "endlatitude", "endlongitude",
-              "resolved_latitude", "resolved_longitude"):
+    for c in ("latitude", "longitude", "endlatitude", "endlongitude", "resolved_latitude", "resolved_longitude"):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
             df.loc[df[c] == 0, c] = np.nan 

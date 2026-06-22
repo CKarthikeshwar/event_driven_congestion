@@ -41,10 +41,17 @@ import decisions as D   # Phase-2 logic
 
 # LP allocator — optional, falls back to proportional if module missing
 try:
-    from astram_lp_allocator import lp_allocate, _covered as _lp_covered
+    from lp_allocator import lp_allocate, _covered as _lp_covered
     _HAS_LP = True
 except ImportError:
     _HAS_LP = False
+
+# Feedback loop — optional, standalone module
+try:
+    import feedback_loop as FL
+    _HAS_FL = True
+except ImportError:
+    _HAS_FL = False
 
 OUTDIR    = "pipeline_out"
 DOW_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -132,9 +139,7 @@ st.title("Event-Driven Congestion Console")
 st.caption("Forecast impact, allocate manpower, trigger barricading & diversion — "
            "all from the Astram event dataset.")
 
-tab_map, tab_triage, tab_manpower, tab_barricade, tab_deep = st.tabs(
-    ["Overview & Map", "Event Triage", "Manpower",
-     "Barricading & Diversion", "Deep ST Forecast"])
+tab_map, tab_triage, tab_manpower, tab_barricade, tab_deep, tab_feedback = st.tabs(["Overview & Map", "Event Triage", "Manpower", "Barricading & Diversion", "Deep ST Forecast", "Feedback Loop"])
 
 # ----------------------------------------------------------------------
 # TAB 1 — OVERVIEW & MAP
@@ -415,3 +420,56 @@ more signal per training example. The ConvLSTM needs denser, longer data to
 show its architectural advantages — it is presented here as a pathway for 
 future extension.
             """)
+
+# ----------------------------------------------------------------------
+# TAB 6 — FEEDBACK LOOP
+# ----------------------------------------------------------------------
+with tab_feedback:
+    st.subheader("Prediction Feedback Loop")
+    st.caption(
+        "Logs every triage prediction, records real outcomes when events resolve, "
+        "detects metric drift, and triggers automatic retraining."
+    )
+
+    log_path = os.path.join(OUTDIR, "predictions_log.csv")
+
+    if os.path.exists(log_path):
+        log = pd.read_csv(log_path)
+        done = log[log["outcome_recorded"] == True]
+        fa, fb, fc = st.columns(3)
+        fa.metric("Predictions logged", len(log))
+        fb.metric("Outcomes recorded",  int(len(done)))
+
+        if _HAS_FL:
+            metrics = FL.evaluate(log)
+            if "reroute_auc" in metrics:
+                fc.metric("Rerouting ROC-AUC (live)", f"{metrics['reroute_auc']:.3f}")
+            st.divider()
+            drifted, flags = FL.detect_drift(metrics)
+            if drifted:
+                st.warning("Drift detected: " + " | ".join(flags))
+            else:
+                st.success("No drift vs baseline.")
+            with st.expander("Full metrics"):
+                st.json(metrics)
+
+        st.markdown("**Last 20 logged predictions:**")
+        st.dataframe(log.tail(20), width="stretch")
+    else:
+        st.info("No predictions logged yet — run the simulation below to populate.")
+
+    st.divider()
+    if st.button("Simulate feedback loop (last 300 events)", type="primary",
+                 key="run_fl"):
+        with st.spinner("Streaming events through the loop..."):
+            result = subprocess.run(
+                [sys.executable, "astram_feedback_loop.py"],
+                capture_output=True, text=True
+            )
+        if result.returncode == 0:
+            st.success("Done!")
+            st.code(result.stdout)
+            st.rerun()
+        else:
+            st.error("Failed.")
+            st.code(result.stderr[-600:])

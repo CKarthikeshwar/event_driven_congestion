@@ -65,9 +65,9 @@ def log_prediction(event_id, event, triage):
     row.update(dict(
         logged_at=dt.datetime.now().isoformat(timespec="seconds"),
         event_id=event_id,
-        pred_priority=int(p.get("priority_high", [np.nan])[0]),
-        pred_priority_proba=float(p.get("priority_high_proba", [np.nan])[0]),
-        pred_reroute=int(p.get("requires_rerouting", [np.nan])[0]),
+        pred_priority=int(D._priority_rule(event.get("corridor_base"), event.get("hour"), event.get("is_weekend"))),
+        pred_priority_proba=float(D._priority_rule(event.get("corridor_base"), event.get("hour"), event.get("is_weekend"))),
+        pred_reroute=int(p.get("requires_rerouting", [0])[0]),
         pred_reroute_proba=float(p.get("requires_rerouting_proba", [np.nan])[0]),
         pred_duration=float(p.get("duration_min", [np.nan])[0]),
         outcome_recorded=False))
@@ -167,8 +167,8 @@ def maybe_retrain(dry_run=True):
             if "modeling_table" not in d and "predictions_log" not in d]
     if not data:
         return False, ["trigger met but no raw dataset found to retrain on"]
-    subprocess.run([sys.executable, "astram_clean.py", data[0]], check=True)
-    subprocess.run([sys.executable, "astram_models.py"], check=True)
+    subprocess.run([sys.executable, "clean.py", data[0]], check=True)
+    subprocess.run([sys.executable, "models.py"], check=True)
     save_baseline(evaluate())                       # refresh baseline post-train
     return True, ["retrained — " + " | ".join(reasons)]
 

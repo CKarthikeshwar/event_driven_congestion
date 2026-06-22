@@ -1,0 +1,8 @@
+{
+  "n_labelled": 300,
+  "priority_acc": 1.0,
+  "priority_auc": 1.0,
+  "reroute_acc": 0.817,
+  "reroute_auc": 0.869,
+  "duration_mae": 183.5
+}
