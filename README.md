@@ -237,7 +237,7 @@ The Post-Event Learning Loop extends ASTraM by introducing a continuous feedback
 
 ## Remarks
 
-Developed as an extension to the **ASTraM (Adaptive Smart Traffic Management)** framework for the Smart India Hackathon problem statement:
+Developed as an extension to the **ASTraM (Adaptive Smart Traffic Management)** framework for the Flipkart Gridlock 2.0 hackathon problem statement:
 
 **Event-Driven Congestion (Planned & Unplanned)**
 
